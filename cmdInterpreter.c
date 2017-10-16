@@ -1,77 +1,169 @@
 /* Command Interpreter */
 
 /* Includes */
-#include <sys/ipc.h>	// Interprocess Comunication
-#include <sys/shm.h>	// Shared Memory
-#include <errno.h>	// Error
-#include <sys/stat.h>	// Stat Definitions
-#include <string.h>	// String
-#include <sys/wait.h>	// Waitpid
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
+#include <sys/ipc.h>		// Interprocess Comunication
+#include <sys/shm.h>		// Shared Memory
+#include <errno.h>		// Error
+#include <sys/stat.h>		// Stat Definitions
+#include <string.h>		// String
+#include <sys/wait.h>		// Waitpid
+#include <stdio.h>		// Input and Output
+#include <stdlib.h>		// Library Definitions
+#include <unistd.h>		// Symbolic Constants and Types
+#include <sys/types.h>		// Types Definition
 
-#define parametersMAX 5
+#include "errorControl.h"	// Error Control Definitions	
 
-/* Enumerations */
-typedef enum {
-	// Shared Memory Error Identifier
-	shm_get	=	1,
-	shm_at	=	2,
-	shm_dt	=	3,
-	shm_ctl	=	4
-} shmError;
+#define parametersMAX 5		// Define max number of parameters
 
-typedef enum {
-	// Return conditions Enum
+enum returnConditions 	
+{
 	exitProgram	        =	0,
 	userProgram		=	1,
 	parametersExceeded	=	2,
 	blank			=	3,
 	ok			=       4
-} returnCond;
+};
 
-/* Functions */
-void shmVerification(int errorControl, shmError e)	// Shared Memory Error Verification
+typedef enum returnConditions returnCond;			// Return conditions
+
+void clearArguments(int* argc, char** argv);			// Clear arguments counter (ARGC) and arguments vector (ARGV)
+
+returnCond interpretCmd (char* cmd, int* argc, char **argv);	// Command interpreter function
+
+/* Main */
+int main(int argc, char * argv[])
 {
-	if(errorControl != -1) {
-		// Everything is okay
-		return;
+	// Declarations                                                                                                       
+	char * scheduler_args[1] = { NULL } ;
+	pid_t pid_cmdInterpreter, pid_scheduler;
+	int status;
+
+	pid_cmdInterpreter = getpid();
+	
+	pid_scheduler = fork(); // Create a new process to execute scheduler
+
+	if (pid_scheduler > 0) // Interpreter Process
+	{
+		// Declarations                                                                                                       
+	        int shmArea_programIdentifier;
+		int shmSize_programIdentifier = 100*sizeof(char);
+	        key_t key_programIdentifier = 8180;
+	        char* programIdentifier;
+
+                int shmArea_schedulerStatus;
+		int shmSize_schedulerStatus = sizeof(int);
+                key_t key_scheduler = 8181;
+                int* schedulerStatus;
+
+		int i;
+		int errorControl;
+		char cmd[30];
+		returnCond state = ok;
+		int ARGC;
+		char **ARGV;
+
+		// Initializations
+		ARGV = (char**) malloc (parametersMAX*sizeof(char*));
+		if(ARGV == NULL) // Fail verification
+		{
+			printf("\nmalloc error\n");
+			exit(1);
+		}
+
+		// Program Identifier - Shared Memory - GET
+		shmArea_programIdentifier = shmget( /* key */ key_programIdentifier, /* size */ shmSize_programIdentifier, /* flags */ IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+		failVerification(shmArea_programIdentifier, shm_get);
+
+		// Scheduler - Shared Memory - GET
+		shmArea_schedulerStatus = shmget( /* key */ key_scheduler, /* size */ shmSize_schedulerStatus, /* flags */ IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+		failVerification(shmArea_schedulerStatus, shm_get);
+
+		// Program Identifier - Shared Memory - ATTACH
+		programIdentifier = (char*) shmat( /* shared memory identifier */ shmArea_programIdentifier, /* shared memory adress */ NULL, /* flags */ 0); 
+		if(programIdentifier == (char*) -1) { errorControl = -1; }
+		failVerification(errorControl , shm_at); 
+
+		// Scheduler - Shared Memory - ATTACH
+		schedulerStatus = (int*) shmat( /* shared memory identifier */ shmArea_schedulerStatus, /* shared memory adress */ NULL, /* flags */ 0); 
+		if(schedulerStatus == (int*) -1) { errorControl = -1; }
+		failVerification(errorControl , shm_at);
+
+		// Command Interpreter
+		printf("Starting Interpreter\t<%d>\n", pid_cmdInterpreter);
+                *schedulerStatus = 1; // Set scheduler status to continue
+
+		while(state != exitProgram) // While dont exit
+		{
+			printf("> "); // Wait for command
+			fflush(stdin);
+			gets(cmd); // Get command
+			state = interpretCmd (cmd, &ARGC, ARGV); // Interpret command
+                        if(state == userProgram) // Command: Execute user program
+			{
+				if(ARGV[0] != NULL) // Assert
+				{
+					// Send new program identification to scheduler
+					strcpy(cmd, ARGV[0]);
+					for(i = 1; i < ARGC; i++)
+					{
+						strcat(cmd, ARGV[i]);
+					}
+					strcpy(programIdentifier, cmd); // New process in shared memory
+					kill(pid_scheduler, SIGUSR1); // Warn scheduler
+				}
+			}
+			else 
+			{
+				if(state == exitProgram) // Command: Exit
+				{
+					*schedulerStatus = 0; // Set scheduler status to exit
+				}
+			}
+		}
+
+		// Finalizations
+                *schedulerStatus = 0; // Set scheduler status to exit
+                waitpid(pid_scheduler, NULL, 0); // Wait for scheduler to end
+
+		errorControl = shmdt( /* adress */ programIdentifier); // Program Identifier - Shared Memory - DEATTACH
+		failVerification(errorControl, shm_dt);
+
+		errorControl = shmdt( /* adress */ schedulerStatus); // Scheduler Status - Shared Memory - DEATTACH
+		failVerification(errorControl, shm_dt);
+
+		_exit(1); // Leave
+	}
+	else
+	{	
+		if (pid_scheduler == 0)	// Scheduler Process
+		{
+			pid_scheduler = getpid();
+			printf("Starting Scheduler\t<%d>\n", pid_scheduler);
+
+			execve( "./scheduler", scheduler_args, NULL); // Execute scheduler process
+			perror("execve failed");
+
+		}
+		else // Fork failed
+		{
+			perror("fork failed");
+			_exit(1); // Leave
+	  	}
 	}
 
-	printf("\nERROR: SHARED MEMORY ERROR\n"); // Shared memory error
-	switch(e)
-	{
-		// Specify error
-		case shm_get:
-			perror("--- shmget: shmget failed");
-			break;
-		case shm_at:
-			perror("--- shmat: shmat failed");
-			break;
-		case shm_dt:
-			perror("--- shmdt: shmdt failed");
-			break;
-		case shm_ctl:
-			perror("--- shmctl: shmctl failed");
-			break;
-		default:
-			perror("--- shm failed");
-	}
-	printf("\n\n");
-	exit(1); // Leave
+	return 0;
 }
+
+/* Auxiliar Functions */
 
 void clearArguments(int* argc, char** argv)	// Clear argc and argv
 {
 	int i;
 
-	// Reset arguments count
-	*argc = 0;
+	*argc = 0; // Reset arguments count
 
-	// Reset arguments vector
-	for(i = 0; i < parametersMAX; i++)
+	for(i = 0; i < parametersMAX; i++) // Reset arguments vector
 	{
 		argv[i] = NULL;
 	}	
@@ -83,8 +175,8 @@ returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpret
 
 	clearArguments(argc, argv);
 
-	if(strcmp(cmd, "exit") == 0) {
-		// Exit command
+	if(strcmp(cmd, "exit") == 0) // Exit command
+	{
 		return exitProgram;
 	}
 	
@@ -111,10 +203,7 @@ returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpret
 			}
 
 			// Save argument in argv
-			strncpy (
-				/* destination */ argv[*argc],
-				/* source + beginIndex */ cmd + start,
-				/* endIndex - beginIndex */ end - start);
+			strncpy ( /* destination */ argv[*argc], /* source + beginIndex */ cmd + start, /* endIndex - beginIndex */ end - start);
 
 			start = end + 1;
 			
@@ -130,144 +219,3 @@ returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpret
 	return userProgram;
 }
 
-returnCond executeCmd (int argv, char** argc)	// Execute command function
-{
-	if(argv == 0) {
-		// No commands to execute
-		return blank;
-	}
-
-	if(strcmp(argc[0], "exec") == 0)
-	{
-		// Call scheduler
-	}
-
-	return ok;
-}
-
-/* Main */
-int main(int argc, char * argv[])
-{
-	// Declarations                                                                                                       
-	char * scheduler_args[1] = { NULL } ;
-	pid_t pid_cmdInterpreter, pid_scheduler;
-	int status;
-
-	pid_cmdInterpreter = getpid();
-	
-	// Create a new process to execute scheduler
-	pid_scheduler = fork();
-
-	if (pid_scheduler > 0)
-	{
-		// Interpreter Process
-		// Declarations                                                                                                       
-	        int shmArea_programIdentifier;
-		int shmSize_programIdentifier = 100*sizeof(char);
-	        key_t key_programIdentifier = 8180;
-                key_t key_scheduler = 8181;
-		int i;
-		int errorControl;
-		char cmd[30];
-		returnCond state = ok;
-		int ARGC;
-		char **ARGV;
-                int* schedulerStatus;
-                int area_scheduler;
-	        char* programIdentifier;
-
-		printf("Starting Interpreter\t<%d>\n", pid_cmdInterpreter);
-
-		ARGV = (char**) malloc (parametersMAX*sizeof(char*));
-		if(ARGV == NULL) // Fail verification
-		{
-			printf("\nmalloc error\n");
-			exit(1);
-		}
-
-		// Program Identifier - Shared Memory - GET
-		shmArea_programIdentifier = shmget(
-			/* key */ key_programIdentifier, 
-			/* size */ shmSize_programIdentifier, 
-			/* flags */ IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
-		shmVerification(shmArea_programIdentifier, shm_get); // Fail verification
-
-		// Program Identifier - Shared Memory - ATTACH
-		programIdentifier = (char*) shmat( 
-			/* shared memory identifier */ shmArea_programIdentifier,
-			/* shared memory adress */ NULL,
-			/* flags */ 0);
-		if(programIdentifier == (char*) -1)
-			errorControl = -1;
-		shmVerification(errorControl , shm_at); // Fail verification
-
-        	area_scheduler = shmget(key_scheduler, sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
-	        if(area_scheduler == -1) {
-        		printf("Erro alocacao memoria compartilhada.\n");
-	        	shmctl(area_scheduler, IPC_RMID, 0);
-		        exit(1);
-	        }
-        	schedulerStatus = (int*) shmat (area_scheduler, 0, 0);
-                *schedulerStatus = 1;
-
-		while(state != exitProgram) // Command interpreter
-		{
-			printf("> "); // Wait for command
-			fflush(stdin);
-			gets(cmd); // Get command
-			state = interpretCmd (cmd, &ARGC, ARGV); // Interpret command
-                        if(state == userProgram)
-			{
-				if(ARGV[0] != NULL) // Assert
-				{
-					// Send new program identification to scheduler
-					strcpy(cmd, ARGV[0]);
-					for(i = 1; i < ARGC; i++)
-					{
-						strcat(cmd, ARGV[i]);
-					}
-					strcpy(programIdentifier, cmd);
-				}
-			}
-			if(state == exitProgram)
-				*schedulerStatus = 0; // Set scheduler status to exit
-		}
-
-                *schedulerStatus = 0; // Set scheduler status to exit
-                waitpid(pid_scheduler, NULL, 0); // Wait for scheduler to end
-
-		// Program Identifier - Shared Memory - DEATTACH
-		errorControl = shmdt(
-			/* adress */ programIdentifier);
-		shmVerification(errorControl, shm_dt); 	// Fail verification
-
-		// Scheduler Status Identifier - Shared Memory - DEATTACH
-		errorControl = shmdt(
-			/* adress */ schedulerStatus);
-		shmVerification(errorControl, shm_dt); // Fail verification
-
-		_exit(1); // Leave
-	}
-	else
-	{	
-		if (pid_scheduler == 0)
-		{
-			// Scheduler Process
-			pid_scheduler = getpid();
-			printf("Starting Scheduler\t<%d>\n", pid_scheduler);
-
-			execve( "./scheduler", scheduler_args, NULL);
-			perror("execve failed");
-
-		}
-
-		else
-		{
-			// Fail verification
-			perror("fork failed");
-			_exit(1);
-	  	}
-	}
-
-	return 0;
-}
