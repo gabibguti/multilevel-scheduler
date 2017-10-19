@@ -15,6 +15,14 @@
 #include "errorControl.h"
 #include "queue.h"
 
+#define parametersMAX 5
+
+typedef enum queueInform
+{
+	goback = 1,
+	dontgoback = 0
+} queueInfo;
+
 char* program;							// Global variable that receives new programs by shared memory
 
 int* status;							// Global variable that receives scheduler status to continue or end
@@ -31,17 +39,19 @@ PCB* removedProcess;						// Global removed process that represents the actual p
 
 void saveProcess (int signal);					// SIGUSR1 - Save Process
 
+void handleIO (int signal);					// SIGUSR2 - Waiting for I/O (w4IO)
+
 void childFinished (int signal);				// SIGCHLD - Verify if child finished or only stopped/continued	
 
 void initializeNewProcess (char* newProcess);			// Create PCB for new process and push it to L1 queue
 
-void executeProcess (PCB* process, int quantumTime);		// Execute new process or continue process execution
+queueInfo executeProcess (PCB* process, int quantumTime);	// Execute new process or continue process execution
 
 void mask();							// Mask/Block signals
 
 void unmask();							// Unmask/Unblock signals
 
-void roundRobin(Queue** q, int quantum, char* queueName);	// Round Robin for a queue with some quantum time
+//void roundRobin(Queue** q, int quantum);			// Round Robin for a queue with some quantum time
 
 /* Main */
 int main(int argc, char *argv[])
@@ -58,8 +68,10 @@ int main(int argc, char *argv[])
 	int shmSize_program = 100*sizeof(char);
 	int shmSize_status = sizeof(int);
 	PCB* processAux;
+	queueInfo situation;
 	
 	signal(SIGUSR1, saveProcess); // Define SIGUSR1
+	signal(SIGUSR2, handleIO); // Define SIGUSR2
 	signal(SIGCHLD, childFinished); // Define SIGCHLD
 
 	// Initializations
@@ -88,12 +100,51 @@ int main(int argc, char *argv[])
 	
 	while(*status == 1)
 	{
-		roundRobin(&L1, L1_quantum, "L1");
-		roundRobin(&L2, L2_quantum, "L2");
-		roundRobin(&L3, L3_quantum, "L3");
+
+		if(queueLength(L1) > 0) // Check if L1 has processes
+		{
+			strcpy(activeQueue, "L1");
+			L1 = queuePull(L1, &removedProcess); // Get next process to execute		
+			mask();
+			situation = executeProcess (removedProcess, L1_quantum); // Execute actual process
+			unmask();
+			if(situation == goback)
+			{
+				L2 = queuePush(L2, removedProcess); // Process didnt finish, then go back to queue L2
+			}
+			activeQueue[0] = '\0';
+		}
+		else if(queueLength(L2) > 0) // Check if L2 has processes
+		{
+			strcpy(activeQueue, "L2");
+			L2 = queuePull(L2, &removedProcess); // Get next process to execute		
+			mask();
+			situation = executeProcess (removedProcess, L2_quantum); // Execute actual process
+			unmask();
+			if(situation == goback)
+			{	
+				L3 = queuePush(L3, removedProcess); // Process didnt finish, then go back to queue L3
+			}
+			activeQueue[0] = '\0';
+		}
+		else if(queueLength(L3) > 0) // Check if L3 has processes
+		{
+			strcpy(activeQueue, "L3");
+			L3 = queuePull(L3, &removedProcess); // Get next process to execute		
+			mask();
+			situation = executeProcess (removedProcess, L3_quantum); // Execute actual process
+			unmask();
+			if(situation == goback)
+			{
+				L3 = queuePush(L3, removedProcess); // Process didnt finish, then go back to queue L3
+			}
+			activeQueue[0] = '\0';
+		}
+
 	}
 	
 	// Finalizations
+	queuePrint(L1);
 	L1 = queueFreeAll(L1); // L1 - Queue - FREE
 	L2 = queueFreeAll(L2); // L1 - Queue - FREE
 	L3 = queueFreeAll(L3); // L1 - Queue - FREE
@@ -130,6 +181,29 @@ void saveProcess (int signal)
 	}
 }
 
+void handleIO (int signal)
+{
+	printf("Process waiting for I/O\n");
+	fflush(stdout);
+	PCB* processWaiting = removedProcess;
+	kill(getPCBPid(processWaiting), SIGSTOP);
+	sleep(3);
+	if(strcmp(activeQueue, "L1") == 0 || strcmp(activeQueue, "L2") == 0)
+	{
+		L1 = queuePush(L1, processWaiting); // Put process in level 1 queue
+	}
+	else if (strcmp(activeQueue, "L3") == 0)
+	{
+		L2 = queuePush(L2, processWaiting); // Put process in level 2 queue
+	}
+	else
+	{
+		printf("ERROR: ACTIVE QUEUE\n--- Cant find from which queue process was removed\n");
+		printf("To prevent error, go back to level 1 queue\n");
+		L1 = queuePush(L1, processWaiting);
+	}
+}
+
 void childFinished (int signal)
 {
 	int pidEncerrado = waitpid(-1, NULL, WNOHANG);
@@ -161,37 +235,125 @@ void childFinished (int signal)
 
 /* Auxiliar Functions */
 
-void initializeNewProcess (char* newProcess)
+void clearArguments(int* argc, char** argv)	// Clear argc and argv
 {
-	PCB* process = newPCB(newProcess);
-	printf("newProcess: %s\n", getPCBName(process));
-	L1 = queuePush(L1, process); // Put process in level 1 queue
+	int i;
 
-	// TO DO: Treat when received a new process and L1 is empty
-	/*	
-	if(strcmp(activeQueue, "L1") != 0) // If queue round robing isnt L1
+	*argc = 0; // Reset arguments count
+
+	for(i = 0; i < parametersMAX - 1; i++) // Reset arguments vector
 	{
-		printf("Stopping actual process to start new");
-		kill(getPCBPid(removedProcess), SIGSTOP); // Stop current process
-		setPCBState(removedProcess, ready); // Set process state to ready
-		if(strcmp(activeQueue, "L2") == 0)
-	}
-	*/
+		argv[i] = NULL;
+	}	
 }
 
-void executeProcess (PCB* process, int quantumTime)	// Execute new process or continue process execution
+void breakNewProcess(char* newProcess, int* argc, char** argv, char* processName)
 {
-	char* args[1] = { NULL };
+	int i, start = 0, end = 0;
+
+	clearArguments(argc, argv);
+
+	for(i = 0; i <= strlen(newProcess); i++) // Read command line
+	{
+
+		if(newProcess[i] == '#' || newProcess[i] == '\0')
+		{
+			if(end - start > 0)
+			{
+				printf("start = %d \t end = %d\n", start, end);
+
+				if(start == 0)
+				{
+					strncpy ( /* destination */ processName, /* source + beginIndex */ newProcess + start, /* endIndex - beginIndex */ end - start);
+				}
+				else
+				{
+					argv[*argc] = (char*) malloc ((end - start + 1)*sizeof(char));
+					if(argv[*argc] == NULL)
+					{
+						printf("\nmalloc error\n");
+						exit(1);
+					}
+
+					// Save argument in argv
+					strncpy ( /* destination */ argv[*argc], /* source + beginIndex */ newProcess + start, /* endIndex - beginIndex */ end - start);
+
+					*argc += 1; // Update argc count
+				}
+				start = i + 1;
+			}
+			else
+			{
+				if((i + 1) > strlen(newProcess))
+				{
+					start = i;
+				}
+				else
+				{
+					start = i + 1;
+				}
+			}
+		}
+		else
+		{
+			if((i + 1) > strlen(newProcess))
+			{
+				end = i;
+			}
+			else
+			{
+				end = i + 1;
+			}
+		}
+	}
+
+	printf("name = %s\n", processName);
+	for(i = 0; i < *argc; i++)
+		printf("argv[%d] = %s\n", i, argv[i]);
+}
+
+void initializeNewProcess (char* newProcess)
+{
+	PCB* process;
+	int argc;
+	char* processName = (char*) malloc (strlen(newProcess)*sizeof(char));
+	char** argv = (char**) malloc ((parametersMAX - 1)*sizeof(char*));
+	if(argv == NULL) // Fail verification
+	{
+		printf("\nmalloc error\n");
+		exit(1);
+	}
+	breakNewProcess(newProcess, &argc, argv, processName);
+	process = newPCB(processName, argc, argv);
+	printf("newProcess: %s\n", getPCBName(process));
+	L1 = queuePush(L1, process); // Put process in level 1 queue
+}
+
+queueInfo executeProcess (PCB* process, int quantumTime)	// Execute new process or continue process execution
+{
+	//char* args[2] = { "hello", NULL };
+	int execError;
 	pid_t pid_scheduler, pid_userProcess;
 	char aux[30];
 
 	if(getPCBState(process) == ready) // Continue user process
 	{
+		printf("Running process\n");
 		kill(getPCBPid(process), SIGCONT); // Continue process
 		setPCBState(process, running); // Set process state to running
 		sleep(quantumTime); // Let process run for a quantum time
-		kill(getPCBPid(process), SIGSTOP); // Stop process
-		setPCBState(process, ready); // Set process state to ready
+		if(getPCBState(process) == running)
+		{
+			printf("Quantum time's up! Stopping process\n");
+			kill(getPCBPid(process), SIGSTOP); // Stop process
+			setPCBState(process, ready); // Set process state to ready
+			return goback;
+		}
+		else
+		{
+			printf("Process terminated or asked for IO\n");
+			return dontgoback;
+		}
 	}
 	else if(getPCBState(process) == new) // New process, start new execution
 	{
@@ -200,20 +362,31 @@ void executeProcess (PCB* process, int quantumTime)	// Execute new process or co
 		{
 			setPCBPid(process, pid_userProcess); // Set new pid for process
 			sleep(quantumTime); // Let process run for a quantum time
-			kill(pid_userProcess, SIGSTOP); // Stop process execution
-			setPCBState(process, ready); // Set process state to ready
+			if(getPCBState(process) == new)
+			{
+				printf("Quantum time's up! Stopping process\n");
+				kill(pid_userProcess, SIGSTOP); // Stop process execution
+				setPCBState(process, ready); // Set process state to ready
+				return goback;
+			}
+			else
+			{
+				printf("Process terminated or asked for IO\n");
+				return dontgoback;
+			}
 		}
 		else // New user program
 		{
 			pid_userProcess = getpid(); // Get new pid
 			strcpy(aux, "./");
 			strcat(aux, getPCBName(process));
-			execve(aux, args, NULL); // Execute new process
+			execve(aux, getPCBArgv(process), NULL); // Execute new process
 			perror("execve failed");
 			fflush(stdout);
+			free(process);
 		}
 	}
-	return;
+	return goback;
 }
 
 void mask()	// Mask/Block signals
@@ -246,17 +419,16 @@ void unmask()	// Unmask/Unblock signals
 	failVerification(errorControl, sig_procmask);
 }
 
-void roundRobin(Queue** q, int quantum, char* queueName)	// Round Robin for a queue with some quantum time
+
+/*void roundRobin(Queue** q, int quantum)	// Round Robin for a queue with some quantum time
 {
 	while(queueLength (*q) > 0 && *status == 1) // Check if queue has processes
 	{
-		strcpy(activeQueue, queueName);
 		*q = queuePull(*q, &removedProcess); // Get next process to execute		
 		mask();
 		executeProcess (removedProcess, quantum); // Execute actual process
 		unmask();
 		*q = queuePush(*q, removedProcess); // Process didnt finish, then go back to queue
 	}
-	activeQueue[0] = '\0';
 }
-
+*/

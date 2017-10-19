@@ -51,13 +51,13 @@ Queue* queuePush(Queue* q, PCB* newProcess)			// Push process to queue
 		printf("Process has no name, wont push!\n");
 		return q;
 	}
-	PCB* pcbCopy = newPCB(getPCBName(newProcess));
+	PCB* pcbCopy = newPCB(getPCBName(newProcess), getPCBArgc(newProcess), getPCBArgv(newProcess));
 	if(pcbCopy == NULL)
 	{
 		printf("ERROR: MEMORY ALLOCATION\n");
 		exit(1);
 	}
-	setPCBPid(pcbCopy, getPCBPid(newProcess)); 
+	setPCBPid(pcbCopy, getPCBPid(newProcess));
 	setPCBState(pcbCopy, getPCBState(newProcess)); 
 	new->pcb = pcbCopy;
 	new->next = NULL;
@@ -89,13 +89,13 @@ Queue* queuePull(Queue* q, PCB** removedProcess)			// Pull process from queue
 		//removedProcess = newPCB (getPCBName(p->pcb));
 		//setPCBPid(removedProcess, getPCBPid(p->pcb));
 		//setPCBState(removedProcess, getPCBState(p->pcb));
-		pcbCopy = newPCB(getPCBName(p->pcb));
+		pcbCopy = newPCB(getPCBName(p->pcb), getPCBArgc(p->pcb), getPCBArgv(p->pcb));
 		if(pcbCopy == NULL)
 		{
 			printf("ERROR: MEMORY ALLOCATION\n");
 			exit(1);
 		}
-		setPCBPid(pcbCopy, getPCBPid(p->pcb)); 
+		setPCBPid(pcbCopy, getPCBPid(p->pcb));
 		setPCBState(pcbCopy, getPCBState(p->pcb)); 
 		*removedProcess = pcbCopy;	
 		//printf("Process %s removed from queue.\n", getPCBName(pcbCopy));
@@ -136,8 +136,10 @@ Queue* queueFreeAll(Queue* q)					// Free all queue processes
 
 void queuePrint(Queue* q)					// Print queue processes
 {
+	int i;
 	Queue* p = q;
 	PCB* aux;
+	char** arguments;
 
 	while(p != NULL)
 	{
@@ -174,6 +176,14 @@ void queuePrint(Queue* q)					// Print queue processes
 				printf("not avaiable\n");
 				fflush(stdout);
 		}
+		printf("Process Arguments: ");
+		fflush(stdout);
+		arguments = getPCBArgv(aux);
+		for(i = 0; i < getPCBArgc(aux); i++)
+		{
+			printf("%s ", arguments[i]);
+		}
+		printf("\n");
 		p = p->next;
 	}
 }

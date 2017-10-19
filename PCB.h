@@ -15,21 +15,28 @@ enum processStateType
 	waiting		=	4
 };
 
-typedef enum processStateType stateType;		// Process States
+typedef enum processStateType stateType;			// Process States
 
-typedef struct processControlBlock PCB;			// PCB structure
+typedef struct processControlBlock PCB;				// PCB structure
 
-PCB* newPCB (char* processName);			// Create new PCB 
+PCB* newPCB (char* processName, int argc, char** argv);		// Create new PCB 
 
-pid_t getPCBPid (PCB* pcb);				// Get process PID
+pid_t getPCBPid (PCB* pcb);					// Get process PID
 
-pid_t setPCBPid (PCB* pcb, pid_t pid);			// Set process PID
+pid_t setPCBPid (PCB* pcb, pid_t pid);				// Set process PID
 
-char* getPCBName (PCB* pcb);				// Get process name
+char* getPCBName (PCB* pcb);					// Get process name
 
-void setPCBName (PCB* pcb, char* name);			// Set process name
+void setPCBName (PCB* pcb, char* name);				// Set process name
 
-stateType getPCBState (PCB* pcb);			// Get process state
+stateType getPCBState (PCB* pcb);				// Get process state
 
-void setPCBState (PCB* pcb, stateType state);		// Set process state
+void setPCBState (PCB* pcb, stateType state);			// Set process state
 
+void setPCBArgc (PCB* pcb, int argc);				// Set process arguments counter
+
+int getPCBArgc (PCB* pcb);					// Get process arguments counter
+
+void setPCBArgv (PCB* pcb, char** argv);			// Set process arguments vector
+
+char** getPCBArgv (PCB* pcb);					// Get process arguments vector

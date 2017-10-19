@@ -6,18 +6,24 @@
 
 #include "PCB.h"
 
+#define parametersMAX 5
+
 struct processControlBlock				// PCB structure
 {
 	pid_t pid;
 	char name[30];
+	char** argv;
+	int argc;
 	stateType state;
 };
 
-PCB* newPCB (char* processName)				// Create new PCB 
+PCB* newPCB (char* processName, int argc, char** argv)	// Create new PCB 
 {
 	PCB* pcb = (PCB*) malloc (sizeof(PCB));
 	pcb->pid = 0;
 	strcpy(pcb->name, processName);
+	pcb->argc = argc;
+	pcb->argv = argv;
 	pcb->state = new;
 	return pcb;
 }
@@ -50,4 +56,24 @@ stateType getPCBState (PCB* pcb)			// Get process state
 void setPCBState (PCB* pcb, stateType state)		// Set process state
 {
 	pcb->state = state;
+}
+
+void setPCBArgc (PCB* pcb, int argc)			// Set process arguments counter
+{
+	pcb->argc = argc;
+}
+
+int getPCBArgc (PCB* pcb)				// Get process arguments counter
+{
+	return pcb->argc;
+}
+
+void setPCBArgv (PCB* pcb, char** argv)			// Set process arguments vector
+{
+	pcb->argv = argv;
+}
+
+char** getPCBArgv (PCB* pcb)				// Get process arguments vector
+{
+	return pcb->argv;
 }

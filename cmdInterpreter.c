@@ -99,16 +99,19 @@ int main(int argc, char * argv[])
 			fflush(stdin);
 			gets(cmd); // Get command
 			state = interpretCmd (cmd, &ARGC, ARGV); // Interpret command
+			printf("state = %d\n", state);
                         if(state == userProgram) // Command: Execute user program
 			{
-				if(ARGV[0] != NULL) // Assert
+				if(strcmp(ARGV[0], "exec") == 0) // Assert
 				{
 					// Send new program identification to scheduler
-					strcpy(cmd, ARGV[0]);
-					for(i = 1; i < ARGC; i++)
+					strcpy(cmd, ARGV[1]);
+					for(i = 2; i < ARGC; i++)
 					{
+						strcat(cmd, "#");
 						strcat(cmd, ARGV[i]);
 					}
+					printf("programIdentifier = %s\n", cmd);
 					strcpy(programIdentifier, cmd); // New process in shared memory
 					kill(pid_scheduler, SIGUSR1); // Warn scheduler
 				}
@@ -131,6 +134,8 @@ int main(int argc, char * argv[])
 
 		errorControl = shmdt( /* adress */ schedulerStatus); // Scheduler Status - Shared Memory - DEATTACH
 		failVerification(errorControl, shm_dt);
+
+		printf("Ending Interpreter\n");
 
 		_exit(1); // Leave
 	}
@@ -169,9 +174,10 @@ void clearArguments(int* argc, char** argv)	// Clear argc and argv
 	}	
 }
 
+
 returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpreter function
 {
-	int i, start = 0, end;
+	int i, start = 0, end = 0;
 
 	clearArguments(argc, argv);
 
@@ -183,37 +189,58 @@ returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpret
 	// User program
 	for(i = 0; i <= strlen(cmd); i++) // Read command line
 	{
-		if((cmd[i] == ' ' || cmd[i] == '\0') && cmd[i - 1] != ' '  && i != 0) // Split arguments by spaces
+
+		if(cmd[i] == ' ' || cmd[i] == '(' || cmd[i] == ')' || cmd[i] == ',' || cmd[i] == '\0')
 		{
-			end = i;
-
-			if(*argc + 1 > parametersMAX)
+			if(end - start > 0)
 			{
-				// Parameters verification	
-				clearArguments(argc, argv);
-				printf("\nWARNING: PARAMETERSMAX ERROR\n--- number of arguments exceeded\n\n");
-				return parametersExceeded;
-			}
+				printf("start = %d \t end = %d\n", start, end);
 
-			argv[*argc] = (char*) malloc ((end - start + 1)*sizeof(char));
-			if(argv[*argc] == NULL)
+				if(*argc + 1 > parametersMAX)
+				{
+					// Parameters verification	
+					clearArguments(argc, argv);
+					printf("\nWARNING: PARAMETERSMAX ERROR\n--- number of arguments exceeded\n\n");
+					return parametersExceeded;
+				}
+
+				argv[*argc] = (char*) malloc ((end - start + 1)*sizeof(char));
+				if(argv[*argc] == NULL)
+				{
+					printf("\nmalloc error\n");
+					exit(1);
+				}
+
+				// Save argument in argv
+				strncpy ( /* destination */ argv[*argc], /* source + beginIndex */ cmd + start, /* endIndex - beginIndex */ end - start);
+
+				*argc += 1; // Update argc count
+
+				start = i + 1;
+			}
+			else
 			{
-				printf("\nmalloc error\n");
-				exit(1);
+				if((i + 1) > strlen(cmd))
+				{
+					start = i;
+				}
+				else
+				{
+					start = i + 1;
+				}
 			}
-
-			// Save argument in argv
-			strncpy ( /* destination */ argv[*argc], /* source + beginIndex */ cmd + start, /* endIndex - beginIndex */ end - start);
-
-			start = end + 1;
-			
-			*argc += 1; // Update argc count
 		}
-
-		if(cmd[i] == ' ' && cmd[i - 1] == ' ') // Treat sequence of spaces
+		else
 		{
-			start = i + 1;
-		}	
+			if((i + 1) > strlen(cmd))
+			{
+				end = i;
+			}
+			else
+			{
+				end = i + 1;
+			}
+		}
 	}
 
 	return userProgram;
