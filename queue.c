@@ -1,17 +1,17 @@
 /* Queue - Implementation */
 
-#include <sys/ipc.h>	// Interprocess Comunication
-#include <sys/shm.h>	// Shared Memory
-#include <errno.h>	// Error
-#include <sys/stat.h>	// Stat Definitions
-#include <string.h>	// String
-#include <sys/wait.h>	// Waitpid
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
+#include <sys/ipc.h>		// Interprocess Comunication
+#include <sys/shm.h>		// Shared Memory
+#include <errno.h>		// Error
+#include <sys/stat.h>		// Stat Definitions
+#include <string.h>		// String
+#include <sys/wait.h>		// Waitpid
+#include <stdio.h>		// Input and Output
+#include <stdlib.h>		// Library Definitions
+#include <unistd.h>		// Symbolic Constants and Types
+#include <sys/types.h>		// Types Definition
 
-#include "queue.h"
+#include "queue.h"		// Queue Definitions
 
 struct queue							// Process Queue
 {
@@ -39,6 +39,7 @@ Queue* queuePush(Queue* q, PCB* newProcess)			// Push process to queue
 {
 	//printf("Trying to push process to queue\n");
 	//fflush(stdout);
+	struct timeval t;
 	Queue * p = q;
 	Queue* new = (Queue*) malloc (sizeof(Queue));
 	if(new == NULL)
@@ -48,7 +49,7 @@ Queue* queuePush(Queue* q, PCB* newProcess)			// Push process to queue
 	}
 	if(strlen(getPCBName(newProcess)) <= 0) // Assert
 	{
-		printf("Process has no name, wont push!\n");
+//		printf("Process has no name, wont push!\n");
 		return q;
 	}
 	PCB* pcbCopy = newPCB(getPCBName(newProcess), getPCBArgc(newProcess), getPCBArgv(newProcess));
@@ -58,7 +59,10 @@ Queue* queuePush(Queue* q, PCB* newProcess)			// Push process to queue
 		exit(1);
 	}
 	setPCBPid(pcbCopy, getPCBPid(newProcess));
-	setPCBState(pcbCopy, getPCBState(newProcess)); 
+	setPCBState(pcbCopy, getPCBState(newProcess));
+	getPCBTimeStructure(newProcess, &t.tv_sec, &t.tv_usec);
+	setPCBTimeStructure(pcbCopy, t); 
+	setPCBQueue(pcbCopy, getPCBQueue(newProcess));
 	new->pcb = pcbCopy;
 	new->next = NULL;
 
@@ -82,6 +86,7 @@ Queue* queuePull(Queue* q, PCB** removedProcess)			// Pull process from queue
 {
 	Queue* p = q;
 	PCB* pcbCopy;
+	struct timeval t;
 
 	if(p != NULL)
 	{
@@ -97,6 +102,9 @@ Queue* queuePull(Queue* q, PCB** removedProcess)			// Pull process from queue
 		}
 		setPCBPid(pcbCopy, getPCBPid(p->pcb));
 		setPCBState(pcbCopy, getPCBState(p->pcb)); 
+		getPCBTimeStructure(p->pcb, &t.tv_sec, &t.tv_usec);
+		setPCBTimeStructure(pcbCopy, t);
+		setPCBQueue(pcbCopy, getPCBQueue(p->pcb));
 		*removedProcess = pcbCopy;	
 		//printf("Process %s removed from queue.\n", getPCBName(pcbCopy));
 		if(q->next != NULL)
@@ -140,6 +148,7 @@ void queuePrint(Queue* q)					// Print queue processes
 	Queue* p = q;
 	PCB* aux;
 	char** arguments;
+	struct timeval t;	
 
 	while(p != NULL)
 	{
@@ -184,7 +193,27 @@ void queuePrint(Queue* q)					// Print queue processes
 			printf("%s ", arguments[i]);
 		}
 		printf("\n");
+		getPCBTimeStructure(aux, &t.tv_sec, &t.tv_usec);
+		printf("Time Controller: %lu\n", t.tv_sec + t.tv_usec);
+		printf("Actual/Last queue: %s\n", getPCBQueue(aux));
 		p = p->next;
 	}
+}
+
+void queueNextTime(Queue* q, time_t* t_s, suseconds_t* t_us)		// Get first process time controller from queue
+{
+	Queue* p = q;
+
+	if(p != NULL)
+	{
+		getPCBTimeStructure(p->pcb, t_s, t_us);
+	}
+	else
+	{
+		printf("Empty queue\n");
+	}
+
+	printf("Got next time controller\n");
+	fflush(stdout);
 }
 

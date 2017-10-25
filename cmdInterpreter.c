@@ -99,7 +99,7 @@ int main(int argc, char * argv[])
 			fflush(stdin);
 			gets(cmd); // Get command
 			state = interpretCmd (cmd, &ARGC, ARGV); // Interpret command
-			printf("state = %d\n", state);
+//			printf("state = %d\n", state);
                         if(state == userProgram) // Command: Execute user program
 			{
 				if(strcmp(ARGV[0], "exec") == 0) // Assert
@@ -111,9 +111,10 @@ int main(int argc, char * argv[])
 						strcat(cmd, "#");
 						strcat(cmd, ARGV[i]);
 					}
-					printf("programIdentifier = %s\n", cmd);
+//					printf("programIdentifier = %s\n", cmd);
 					strcpy(programIdentifier, cmd); // New process in shared memory
 					kill(pid_scheduler, SIGUSR1); // Warn scheduler
+					while(programIdentifier[0] != '\0') {  }
 				}
 			}
 			else 
@@ -194,7 +195,7 @@ returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpret
 		{
 			if(end - start > 0)
 			{
-				printf("start = %d \t end = %d\n", start, end);
+				//printf("start = %d \t end = %d\n", start, end);
 
 				if(*argc + 1 > parametersMAX)
 				{

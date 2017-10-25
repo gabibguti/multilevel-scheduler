@@ -1,19 +1,21 @@
 /* Scheduler */
 
 /* Includes */
-#include <sys/ipc.h>	// Interprocess Comunication
-#include <sys/shm.h>	// Shared Memory
-#include <errno.h>	// Error
-#include <sys/stat.h>	// Stat Definitions
-#include <string.h>	// String
-#include <sys/wait.h>	// Waitpid
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
 
-#include "errorControl.h"
-#include "queue.h"
+#include <sys/ipc.h>		// Interprocess Comunication
+#include <sys/shm.h>		// Shared Memory
+#include <errno.h>		// Error
+#include <sys/stat.h>		// Stat Definitions
+#include <string.h>		// String
+#include <sys/wait.h>		// Waitpid
+#include <stdio.h>		// Input and Output
+#include <stdlib.h>		// Library Definitions
+#include <unistd.h>		// Symbolic Constants and Types
+#include <sys/types.h>		// Types Definition
+#include <sys/time.h>		// Time Definitions
+
+#include "errorControl.h"	// Error Control Definitions	
+#include "queue.h"		// Queue Definitions	
 
 #define parametersMAX 5
 
@@ -21,7 +23,7 @@ typedef enum queueInform
 {
 	goback = 1,
 	dontgoback = 0
-} queueInfo;
+} queueInfo;							// Queue situations
 
 char* program;							// Global variable that receives new programs by shared memory
 
@@ -33,9 +35,14 @@ Queue* L2;							// Global queue L2
 
 Queue* L3;							// Global queue L3
 
+Queue* waitingIO;						// Global queue of processes waiting for I/O
+
 char activeQueue[10];						// Global variable that saves the active queue round robing
 
 PCB* removedProcess;						// Global removed process that represents the actual process running
+
+PCB* processWaiting;						// Global variable to manipulate removed and pushed processes to waiting for I/0 queue
+
 
 void saveProcess (int signal);					// SIGUSR1 - Save Process
 
@@ -72,12 +79,14 @@ int main(int argc, char *argv[])
 	
 	signal(SIGUSR1, saveProcess); // Define SIGUSR1
 	signal(SIGUSR2, handleIO); // Define SIGUSR2
+	signal(SIGALRM, handleIO); // Define SIGALRM
 	signal(SIGCHLD, childFinished); // Define SIGCHLD
 
 	// Initializations
 	L1 = newQueue(L1);
 	L2 = newQueue(L2);
 	L3 = newQueue(L3);
+	waitingIO = newQueue(waitingIO);
 	// Program - Shared Memory - GET
 	shmArea_program = shmget( /* key */ key_program, /* size */ shmSize_program, /* flags */ IPC_CREAT | S_IRUSR | S_IWUSR);
 	failVerification(shmArea_program, shm_get);
@@ -103,51 +112,61 @@ int main(int argc, char *argv[])
 
 		if(queueLength(L1) > 0) // Check if L1 has processes
 		{
-			strcpy(activeQueue, "L1");
+			printf("L1\n");
 			L1 = queuePull(L1, &removedProcess); // Get next process to execute		
 			mask();
 			situation = executeProcess (removedProcess, L1_quantum); // Execute actual process
 			unmask();
 			if(situation == goback)
 			{
+				if(removedProcess == NULL)
+					printf("Null process\n");
+				setPCBQueue(removedProcess, "L2");
 				L2 = queuePush(L2, removedProcess); // Process didnt finish, then go back to queue L2
 			}
-			activeQueue[0] = '\0';
 		}
 		else if(queueLength(L2) > 0) // Check if L2 has processes
 		{
-			strcpy(activeQueue, "L2");
+			printf("L2\n");
 			L2 = queuePull(L2, &removedProcess); // Get next process to execute		
 			mask();
 			situation = executeProcess (removedProcess, L2_quantum); // Execute actual process
 			unmask();
 			if(situation == goback)
-			{	
+			{
+				if(removedProcess == NULL)
+					printf("Null process\n");
+				setPCBQueue(removedProcess, "L3");
 				L3 = queuePush(L3, removedProcess); // Process didnt finish, then go back to queue L3
 			}
-			activeQueue[0] = '\0';
 		}
 		else if(queueLength(L3) > 0) // Check if L3 has processes
-		{
-			strcpy(activeQueue, "L3");
+		{	
+			printf("L3\n");
 			L3 = queuePull(L3, &removedProcess); // Get next process to execute		
 			mask();
 			situation = executeProcess (removedProcess, L3_quantum); // Execute actual process
 			unmask();
 			if(situation == goback)
 			{
+				if(removedProcess == NULL)
+					printf("Null process\n");
+				setPCBQueue(removedProcess, "L3");
 				L3 = queuePush(L3, removedProcess); // Process didnt finish, then go back to queue L3
 			}
-			activeQueue[0] = '\0';
 		}
 
 	}
 	
 	// Finalizations
 	queuePrint(L1);
+	queuePrint(L2);
+	queuePrint(L3);
+	queuePrint(waitingIO);
 	L1 = queueFreeAll(L1); // L1 - Queue - FREE
 	L2 = queueFreeAll(L2); // L1 - Queue - FREE
 	L3 = queueFreeAll(L3); // L1 - Queue - FREE
+	waitingIO = queueFreeAll(waitingIO);
 	
 	errorControl = shmdt( /* adress */ program); // Program - Shared Memory - DEATTACH
 	failVerification(errorControl, shm_dt);
@@ -183,51 +202,90 @@ void saveProcess (int signal)
 
 void handleIO (int signal)
 {
-	printf("Process waiting for I/O\n");
-	fflush(stdout);
-	PCB* processWaiting = removedProcess;
-	kill(getPCBPid(processWaiting), SIGSTOP);
-	sleep(3);
-	if(strcmp(activeQueue, "L1") == 0 || strcmp(activeQueue, "L2") == 0)
-	{
-		L1 = queuePush(L1, processWaiting); // Put process in level 1 queue
-	}
-	else if (strcmp(activeQueue, "L3") == 0)
-	{
-		L2 = queuePush(L2, processWaiting); // Put process in level 2 queue
-	}
-	else
-	{
-		printf("ERROR: ACTIVE QUEUE\n--- Cant find from which queue process was removed\n");
-		printf("To prevent error, go back to level 1 queue\n");
-		L1 = queuePush(L1, processWaiting);
+	char removedFrom[10]; // Manipulate from which queue process was removed
+	struct timeval t1; // Actual process I/0 start time
+	struct timeval t2; // Next process I/O start time
+	unsigned long long t; // Next alarm time
+
+	switch(signal) {
+		case SIGUSR2:
+			processWaiting = removedProcess;
+			kill(getPCBPid(processWaiting), SIGSTOP);
+			setPCBState(processWaiting, waiting);
+//			printf("Process waiting for I/O\n");
+//			fflush(stdout);
+			gettimeofday(&t1, NULL);
+			setPCBTimeStructure(processWaiting, t1);		
+			if(queueLength(waitingIO) == 0) // Only one process waiting for I/O
+			{
+				alarm(3); // Start Alarm
+			}
+			waitingIO = queuePush(waitingIO, processWaiting); // Push process to waiting for I/O queue
+			break;
+		case SIGALRM:
+			waitingIO = queuePull(waitingIO, &processWaiting); // Pull process from waiting for I/O queue
+			if(queueLength(waitingIO) > 0) // Still have processes waiting for I/O
+			{
+				getPCBTimeStructure(processWaiting, &t1.tv_sec, &t1.tv_usec);
+				queueNextTime(waitingIO, &t2.tv_sec, &t2.tv_usec);
+				t = 1000 * (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) / 1000;
+				ualarm(t, 0);
+//				printf("t = %llu\n", t);
+			}
+//			printf("I/O received for process %d\n", getPCBPid(processWaiting));
+			setPCBState(processWaiting, ready);
+			strcpy(removedFrom, getPCBQueue(processWaiting));
+			if(strcmp(removedFrom, "L1") == 0 || strcmp(removedFrom, "L2") == 0)
+			{
+				setPCBQueue(processWaiting, "L1");
+				L1 = queuePush(L1, processWaiting); // Put process in level 1 queue
+			}
+			else if (strcmp(removedFrom, "L3") == 0)
+			{
+				setPCBQueue(processWaiting, "L2");
+				L2 = queuePush(L2, processWaiting); // Put process in level 2 queue
+			}
+			else
+			{
+				printf("ERROR: QUEUE\n--- Cant find from which queue process was removed\n");
+				printf("To prevent error, go back to level 1 queue\n");
+				setPCBQueue(processWaiting, "L1");
+				L1 = queuePush(L1, processWaiting);
+			}
+			processWaiting = NULL;
+			break;
+		default:
+			printf("Something went really really wrong here, signals are going crazy\n");
 	}
 }
 
 void childFinished (int signal)
 {
 	int pidEncerrado = waitpid(-1, NULL, WNOHANG);
-	if (pidEncerrado == 0) // Process received a SIGSTOP/SIGCONT signal
+	if(pidEncerrado > 0)
+	{
+		// Else child finished
+		if(getPCBPid(removedProcess) == pidEncerrado) // Assert
+		{
+			setPCBState (removedProcess, terminated); // Set process state to terminated
+			free(removedProcess); // Destroy process
+//			printf("Child %d finished!\n", pidEncerrado);
+//			fflush(stdout);
+		}
+		else // Something went wrong
+		{
+			printf("ERROR: LOST PROCESS\n--- Actual process running %d is not the one that finished.\n", pidEncerrado);
+			fflush(stdout);
+			exit(1);
+		}
+	}
+	else if (pidEncerrado == 0) // Process received a SIGSTOP/SIGCONT signal
 	{
 		return; // Then do nothing
 	}
 	else if (pidEncerrado == -1) // Something went wrong
 	{
 		printf("ERROR: PID ERROR\n");
-		fflush(stdout);
-		exit(1);
-	}
-	// Else child finished
-	printf("Child %d finished!\n", pidEncerrado);
-	fflush(stdout);
-	if(getPCBPid(removedProcess) == pidEncerrado) // Assert
-	{
-		setPCBState (removedProcess, terminated); // Set process state to terminated
-		free(removedProcess); // Destroy process
-	}
-	else // Something went wrong
-	{
-		printf("ERROR: LOST PROCESS\n--- Actual process running is not the one that finished.\n");
 		fflush(stdout);
 		exit(1);
 	}
@@ -260,7 +318,7 @@ void breakNewProcess(char* newProcess, int* argc, char** argv, char* processName
 		{
 			if(end - start > 0)
 			{
-				printf("start = %d \t end = %d\n", start, end);
+//				printf("start = %d \t end = %d\n", start, end);
 
 				if(start == 0)
 				{
@@ -307,9 +365,9 @@ void breakNewProcess(char* newProcess, int* argc, char** argv, char* processName
 		}
 	}
 
-	printf("name = %s\n", processName);
-	for(i = 0; i < *argc; i++)
-		printf("argv[%d] = %s\n", i, argv[i]);
+//	printf("name = %s\n", processName);
+//	for(i = 0; i < *argc; i++)
+//		printf("argv[%d] = %s\n", i, argv[i]);
 }
 
 void initializeNewProcess (char* newProcess)
@@ -325,8 +383,9 @@ void initializeNewProcess (char* newProcess)
 	}
 	breakNewProcess(newProcess, &argc, argv, processName);
 	process = newPCB(processName, argc, argv);
-	printf("newProcess: %s\n", getPCBName(process));
+	setPCBQueue(process, "L1");
 	L1 = queuePush(L1, process); // Put process in level 1 queue
+//	printf("newProcess: %s\n", getPCBName(process));
 }
 
 queueInfo executeProcess (PCB* process, int quantumTime)	// Execute new process or continue process execution
@@ -338,20 +397,32 @@ queueInfo executeProcess (PCB* process, int quantumTime)	// Execute new process 
 
 	if(getPCBState(process) == ready) // Continue user process
 	{
-		printf("Running process\n");
 		kill(getPCBPid(process), SIGCONT); // Continue process
 		setPCBState(process, running); // Set process state to running
+		printf("Running process\n");
 		sleep(quantumTime); // Let process run for a quantum time
 		if(getPCBState(process) == running)
 		{
-			printf("Quantum time's up! Stopping process\n");
 			kill(getPCBPid(process), SIGSTOP); // Stop process
 			setPCBState(process, ready); // Set process state to ready
+			printf("Quantum time's up! Stopping process\n");		
 			return goback;
+		}
+		else if (getPCBState(process) == waiting)
+		{
+			printf("Process asked for IO\n");
+			return dontgoback;
+		}
+		else if (getPCBState(process) == terminated)
+		{
+			printf("Process terminated\n");
+			free(process);
+			return dontgoback;
 		}
 		else
 		{
-			printf("Process terminated or asked for IO\n");
+			printf("Something went really really wrong here, process was running but got confused with finishing or IO event\n");
+			free(process);
 			return dontgoback;
 		}
 	}
@@ -364,14 +435,26 @@ queueInfo executeProcess (PCB* process, int quantumTime)	// Execute new process 
 			sleep(quantumTime); // Let process run for a quantum time
 			if(getPCBState(process) == new)
 			{
-				printf("Quantum time's up! Stopping process\n");
 				kill(pid_userProcess, SIGSTOP); // Stop process execution
 				setPCBState(process, ready); // Set process state to ready
+				printf("Quantum time's up! Stopping new process\n");
 				return goback;
+			}
+			else if (getPCBState(process) == waiting)
+			{
+				printf("Process asked for IO\n");
+				return dontgoback;
+			}
+			else if (getPCBState(process) == terminated)
+			{
+				printf("Process terminated\n");
+				free(process);
+				return dontgoback;
 			}
 			else
 			{
-				printf("Process terminated or asked for IO\n");
+				printf("Something went really really wrong here, process was running but got confused with finishing or IO event\n");
+				free(process);
 				return dontgoback;
 			}
 		}
@@ -383,7 +466,9 @@ queueInfo executeProcess (PCB* process, int quantumTime)	// Execute new process 
 			execve(aux, getPCBArgv(process), NULL); // Execute new process
 			perror("execve failed");
 			fflush(stdout);
+			printf("Erro ao executar programa, liberando...\n");
 			free(process);
+			return dontgoback;
 		}
 	}
 	return goback;
