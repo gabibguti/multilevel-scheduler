@@ -1,0 +1,964 @@
+Trabalho de Sistemas de Computação [INF1019]
+
+Nome:		Gabriela Bevilacqua Gutierrez
+Matrícula:	1511241
+Professor:	Luiz Fernando Bessa Seibel
+
+1. Processo de Compilação
+gcc -o cmdInterpreter cmdInterpreter.c errorControl.c
+gcc -o scheduler scheduler.c errorControl.c queue.c PCB.c
+gcc -o userProgram userProgram.c
+
+2. Modo de uso
+Abrir o terminal.
+Entrar no diretório referente ao trabalho.
+Executar o arquivo do interpretador digitando "./cmdInterpreter".
+Digitar os comandos no próprio terminal ou dê um CTRL+SHIFT+V de uma "lista" de comandos, mas agora durante a execução do interpretador.
+Para terminar o programa do interpretador digite "exit".
+
+3. Testes
+
+## Primeira camada de testes
+
+#1 OK Teste de prevenção de erros no comando exec
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec
+exec userProgram
+exec userProgram ()
+exec userProgram (0)
+exec userProgram (b)
+exec programa (1)
+EXEC userProgram (1)
+exit
+Invalid command, please try again with:
+exec *program_name* *arguments*
+exit
+Invalid command, please try again with:
+exec *program_name* *arguments*
+exit
+Invalid command, please try again with:
+exec *program_name* *arguments*
+exit
+ERROR: Program dont accept zero as argument
+Invalid command, please try again with:
+exec *program_name* *arguments*
+exit
+ERROR: Program dont accept zero as argument
+Invalid command, please try again with:
+exec *program_name* *arguments*
+exit
+Invalid command, please try again with:
+exec *program_name* *arguments*
+exit
+Invalid command, please try again with:
+exec *program_name* *arguments*
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#2 OK Teste de numero máximo de parâmetros (alterando a variável parametersMAX para 5)
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (1,2,3)
+exec userProgram (1,2,3,4,5,6,7,8,9,10)
+Signal 10 received! Preparing to save process!
+L1
+
+WARNING: PARAMETERSMAX ERROR
+--- number of arguments exceeded
+
+10555
+Quantum time's up! Stopping new process
+L2
+Running process
+Process asked for IO
+L1
+Running process
+10555
+Quantum time's up! Stopping process
+L2
+Running process
+10555
+Process asked for IO
+L1
+Running process
+10555
+Quantum time's up! Stopping process
+L2
+Running process
+10555
+10555
+Quantum time's up! Stopping process
+L3
+Running process
+Quantum time's up! Stopping process
+Child 10555 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#3 OK Teste para o comando exit
+$ ./cmdInterpreter
+***Command Interpreter start***
+
+***Scheduler start***
+
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+## Segunda Camada de Testes
+
+#4 OK Teste para rajada 1 segundo
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (1)
+Signal 10 received! Preparing to save process!
+L1
+10727
+Quantum time's up! Stopping new process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10727 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#5 OK Teste para rajada 2 segundos
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (2)
+Signal 10 received! Preparing to save process!
+L1
+10765
+Quantum time's up! Stopping new process
+L2
+Running process
+10765
+Quantum time's up! Stopping process
+Child 10765 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#6 OK Teste para rajada de 3 segundos
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (3)
+Signal 10 received! Preparing to save process!
+L1
+10792
+Quantum time's up! Stopping new process
+L2
+Running process
+10792
+10792
+Quantum time's up! Stopping process
+L3
+Running process
+Quantum time's up! Stopping process
+Child 10792 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#7 OK Teste para execução de uma rajada de 10 segundos
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (10)
+Signal 10 received! Preparing to save process!
+L1
+10826
+Quantum time's up! Stopping new process
+L2
+Running process
+10826
+10826
+Quantum time's up! Stopping process
+L3
+Running process
+10826
+10826
+10826
+10826
+Quantum time's up! Stopping process
+L3
+Running process
+10826
+10826
+10826
+Quantum time's up! Stopping process
+Child 10826 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#8 OK Teste para processos de 1 rajada rodando juntos
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (1)
+exec userProgram (2)
+exec userProgram (3)
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+Signal 10 received! Preparing to save process!
+10869
+Quantum time's up! Stopping new process
+L1
+10870
+Quantum time's up! Stopping new process
+L1
+10871
+Quantum time's up! Stopping new process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10869 finished!
+L2
+Running process
+10870
+Quantum time's up! Stopping process
+Child 10870 finished!
+L2
+Running process
+10871
+10871
+Quantum time's up! Stopping process
+L3
+Running process
+Quantum time's up! Stopping process
+Child 10871 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+## Terceira Camada de Testes
+
+#9 OK Teste de processos com rajadas diferentes rodando juntos
+$ ./cmdInterpreter
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (10, 1)
+exec userProgram (3, 3)
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+10914
+Quantum time's up! Stopping new process
+L1
+10915
+Quantum time's up! Stopping new process
+L2
+10914
+Running process
+10914
+Quantum time's up! Stopping process
+L2
+Running process
+10915
+10915
+Quantum time's up! Stopping process
+L3
+Running process
+10914
+10914
+10914
+10914
+Quantum time's up! Stopping process
+L3
+Running process
+Process asked for IO
+L3
+Running process
+10914
+Quantum time's up! Stopping process
+L2
+Running process
+10915
+10915
+Quantum time's up! Stopping process
+L3
+Running process
+10914
+10914
+Process asked for IO
+L3
+Running process
+10915
+Quantum time's up! Stopping process
+L2
+Running process
+10914
+Quantum time's up! Stopping process
+Child 10914 finished!
+L3
+Running process
+Quantum time's up! Stopping process
+Child 10915 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#10 OK Testes para rajadas pequenas com 2 processos pedindo I/O juntos
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (1)
+exec userProgram (1,1)
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+10944
+Quantum time's up! Stopping new process
+L1
+10945
+Quantum time's up! Stopping new process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10944 finished!
+L2
+Running process
+Process asked for IO
+L1
+Running process
+10945
+Quantum time's up! Stopping process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10945 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#11 OK Testes para 3 processos com rajadas pequenas pedindo I/O juntos
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (1)
+exec userProgram (1,1)
+exec userProgram (1,1,1)
+Signal 10 received! Preparing to save process!
+L1
+L1
+Signal 10 received! Preparing to save process!
+Signal 10 received! Preparing to save process!
+10958
+Quantum time's up! Stopping new process
+L1
+10959
+Quantum time's up! Stopping new process
+L1
+10961
+Quantum time's up! Stopping new process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10958 finished!
+L2
+Running process
+Process asked for IO
+L2
+Running process
+Process asked for IO
+L1
+Running process
+10959
+Quantum time's up! Stopping process
+L1
+Running process
+10961
+Quantum time's up! Stopping process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10959 finished!
+L2
+Running process
+Process asked for IO
+L1
+Running process
+10961
+Quantum time's up! Stopping process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10961 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#12 NOT OK Testes para 4 processos pedindo I/O juntos e com rajadas pequenas acabando "ao mesmo tempo"
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (1)
+exec userProgram (1,1)
+exec userProgram (1,1,1)
+exec userProgram (1,1,1,1)
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+Signal 10 received! Preparing to save process!
+Signal 10 received! Preparing to save process!
+10994
+Quantum time's up! Stopping new process
+L1
+10995
+Quantum time's up! Stopping new process
+L1
+10996
+Quantum time's up! Stopping new process
+L1
+10997
+Quantum time's up! Stopping new process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10994 finished!
+L2
+Running process
+Process asked for IO
+L2
+Running process
+Quantum time's up! Stopping process
+L1
+Running process
+10995
+Quantum time's up! Stopping process
+L1
+10996
+Running process
+Process asked for IO
+L2
+Running process
+Process asked for IO
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10995 finished!
+L1
+Running process
+10996
+Quantum time's up! Stopping process
+L1
+Running process
+10997
+Quantum time's up! Stopping process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 10996 finished!
+L1
+Running process
+Quantum time's up! Stopping process
+L2
+Running process
+10997
+Process asked for IO
+L2
+Running process
+10997
+Quantum time's up! Stopping process
+L1
+Running process
+Quantum time's up! Stopping process
+Child 10997 finished!
+L3
+Running process
+Quantum time's up! Stopping process
+L3
+L3
+Running process
+Quantum time's up! Stopping process
+L3
+Running process
+Quantum time's up! Stopping process
+L3
+Running process
+exit
+Quantum time's up! Stopping process
+Process Name: userProgram
+Process PID: 10996
+Process State: ready
+Process Arguments: 1 1 1 
+Time Controller: 1509894389
+Actual/Last queue: L3
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#13 OK Teste para processos mais longos com I/O junto
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (10,1,1)
+exec userProgram (6,3,3)
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+11042
+Quantum time's up! Stopping new process
+L1
+11057
+Quantum time's up! Stopping new process
+L2
+Running process
+11042
+11042
+Quantum time's up! Stopping process
+L2
+Running process
+11057
+11057
+Quantum time's up! Stopping process
+L3
+Running process
+11042
+11042
+11042
+11042
+Quantum time's up! Stopping process
+L3
+Running process
+11057
+11057
+11057
+Process asked for IO
+L3
+Running process
+11042
+Quantum time's up! Stopping process
+L2
+Running process
+11057
+11057
+Quantum time's up! Stopping process
+L3
+Running process
+11042
+11042
+Process asked for IO
+L3
+Running process
+11057
+Quantum time's up! Stopping process
+L2
+Running process
+11042
+Process asked for IO
+L3
+Running process
+Process asked for IO
+L1
+Running process
+11042
+Quantum time's up! Stopping process
+L2
+Running process
+11057
+11057
+Quantum time's up! Stopping process
+L2
+Running process
+Quantum time's up! Stopping process
+Child 11042 finished!
+L3
+Running process
+11057
+Quantum time's up! Stopping process
+Child 11057 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#14 NOT OK Teste para 3 processos com rajadas iguais
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (2, 1)
+exec userProgram (2, 1)
+exec userProgram (2, 1)
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+Signal 10 received! Preparing to save process!
+11071
+Quantum time's up! Stopping new process
+L1
+11072
+Quantum time's up! Stopping new process
+L1
+11073
+Quantum time's up! Stopping new process
+L2
+Running process
+11071
+Process asked for IO
+L2
+Running process
+11072
+Quantum time's up! Stopping process
+L1
+11071
+Running process
+Quantum time's up! Stopping process
+L2
+Running process
+11073
+Process asked for IO
+ERROR: LOST PROCESS
+--- Actual process running 11071 is not the one that finished.
+Process Name: userProgram
+Process PID: 11071
+Process State: ready
+Process Arguments: 2 1 
+Time Controller: 1509095275
+Actual/Last queue: L2
+Process Name: userProgram
+Process PID: 11072
+Process State: ready
+Process Arguments: 2 1 
+Time Controller: 0
+Actual/Last queue: L3
+Process Name: userProgram
+Process PID: 11073
+Process State: waiting
+Process Arguments: 2 1 
+Time Controller: 1509099109
+Actual/Last queue: L2
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+exit
+
+***Command Interpreter end***
+
+#15 OK Testes para processos mais longos e rajadas maiores
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (7, 4)
+exec userProgram (5, 5)
+exec userProgram (4, 3, 3, 3)
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+Signal 10 received! Preparing to save process!
+11101
+Quantum time's up! Stopping new process
+L1
+11102
+Quantum time's up! Stopping new process
+L1
+11103
+Quantum time's up! Stopping new process
+L2
+Running process
+11101
+11101
+Quantum time's up! Stopping process
+L2
+Running process
+11102
+11102
+Quantum time's up! Stopping process
+L2
+Running process
+11103
+11103
+Quantum time's up! Stopping process
+L3
+Running process
+11101
+11101
+11101
+11101
+Quantum time's up! Stopping process
+L3
+Running process
+11102
+11102
+Process asked for IO
+L3
+Running process
+11103
+Quantum time's up! Stopping process
+L2
+Running process
+11102
+11102
+Quantum time's up! Stopping process
+L3
+Running process
+Process asked for IO
+L3
+Running process
+Process asked for IO
+L3
+Running process
+11102
+Quantum time's up! Stopping process
+L2
+Running process
+Quantum time's up! Stopping process
+L2
+Running process
+Quantum time's up! Stopping process
+L3
+Running process
+11102
+11102
+Quantum time's up! Stopping process
+Child 11102 finished!
+L3
+Running process
+11101
+11101
+11101
+11101
+Quantum time's up! Stopping process
+L3
+Running process
+11103
+11103
+11103
+Process asked for IO
+L3
+Running process
+Quantum time's up! Stopping process
+Child 11101 finished!
+L2
+Running process
+11103
+11103
+Quantum time's up! Stopping process
+L3
+Running process
+11103
+Process asked for IO
+L2
+Running process
+11103
+11103
+Quantum time's up! Stopping process
+L3
+Running process
+11103
+Quantum time's up! Stopping process
+Child 11103 finished!
+exit
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+#16 OK Teste para sair do programa antes de acabar
+$ ./cmdInterpreter
+
+***Command Interpreter start***
+
+***Scheduler start***
+
+exec userProgram (7, 4)
+exec userProgram (5, 5)
+exit
+Signal 10 received! Preparing to save process!
+L1
+Signal 10 received! Preparing to save process!
+11135
+Quantum time's up! Stopping new process
+Process Name: userProgram
+Process PID: 0
+Process State: new
+Process Arguments: 5 5 
+Time Controller: 0
+Actual/Last queue: L1
+Process Name: userProgram
+Process PID: 11135
+Process State: ready
+Process Arguments: 7 4 
+Time Controller: 0
+Actual/Last queue: L2
+Freeing Processes
+Freeing Processes
+Freeing Processes
+Freeing Processes
+
+***Scheduler end***
+
+***Command Interpreter end***
+
+4. Resumo da produção do trabalho
+O trabalho foi separado em um arquivo para o interpretador, um arquivo para o escalonador e um arquivo para os processos usuário. A lógica do programa é que o interpretador é executado inicialmente e chama o escalonador para executar. Da mesma forma, o escalonador chama os processos usuário para executar de acordo com as especificações passadas.
+
+5. Detalhes da implementação
+Para auxiliar a implementação e simplificar o código foram implementados arquivos auxiliares para controle de erro na memória compartilhada ou na manipulação do bloqueio e desbloqueio de sinais. Além disso, também foi implementado um TAD para fila de processos e um TAD para processos.
+Na finalização do programa com "exit", o interpretador finaliza o escalonador e os processos usuário.
+Como o interpretador e o escalonador executam juntos no terminal, os printfs com os pids dos processos no momento da sua execução ficam um pouco enrolados com os comandos digitados no meio das exibições e até mesmo quando nao existe nenhum processo exibindo seu pid, no entanto este é apenas um detalhe de implementação e não atrapalha em nada o funcionamento do programa.
+As filas foram implementadas com lista, então não existe problema quanto ao número de processos nas filas do escalonador.
+O programa aceita até 100 parametros por comando, contando com "exec" e *nome_do_programa*, e comandos de até 400 caracteres.
+
+6. Funcionalidades
+Interpretador:		Interpretar o comando digitado no terminal e executá-lo. 
+		Os comandos aceitos pelo interpretador são: exec *nome_do_programa* *rajadas* (para executar um programa usuário passando as rajadas como parâmetros) e exit (para finalizar o programa corretamente).
+Escalonador:		Escalonar os processos usuário, que começam na fila 1, caem de fila caso o quantum da fila acabe antes do processo acabar ou entrar em I/O, e sobem de fila caso acabem ou entrem em I/O antes do quantum da fila acabar. Quando o processo termina ele é liberado.
+Processo Usuário:	Processo que executa um for para cada rajada recebida e entre as rajadas ele pede I/O para o escalonador.
+
+7. Observações
+O interpretador não aceita rajadas com tempo 0, pois na validação de argumentos como números, a função atoi utilizada converte para 0 caso um dos caracteres da rajada seja uma letra.
+Nos testes não ocorreram problemas de memória compartilhada, embora caso ocorra deve-se: modificar o while(*status == 1) do arquivo scheduler.c para while(0), recompilar o scheduler e executá-lo sozinho para "voltar" a liberar as chaves utilizadas.
+			
+8. Arquivos
+cmdInterpreter.c			Interpretador de Comandos
+scheduler.c				Escalonador de Processos
+errorControl.h / erroControl.c		Controle de erros
+queue.h / queue.c			Fila de processos		
+PCB.h / PCB.c				Bloco de controle de processo
+userProgram.c				Processo Usuário
+
+9. Problemas
+Quando o processo usuário pede I/O "ao mesmo tempo" que o quantum da fila acaba, ocorre um delay no pedido de I/O e o processo só consegue pedir I/O na próxima execução.
+A mesma coisa ocorre quando o processo acaba "ao mesmo tempo" que o quantum da fila acaba, ocorre um delay no tratamento de término do processo e o processo só termina na próxima execução.
+Como tudo é executado ao mesmo tempo, as vezes os processos que estão em fase de tratamento de término se "perdem". Para tentar corrigir esse problema foi adicionada uma assertiva para checar nas novas execuções se o pid do processo a ser executado é igual ao pid do último processo finalizado, para então tratá-lo corretamente e finaliza-lo, mas se tiverem 2 ou mais processos acabando "ao mesmo tempo" o programa perde os processos ( Esse problema ocorreu nos testes #12 e #14 ).
+
+10. Esclarecimentos
+- O código do trabalho foi produzido em inglês.
+- O trabalho está disponível também no link "https://github.com/gabibguti/multilevel-scheduler" no github.
+

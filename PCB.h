@@ -16,39 +16,39 @@ enum processStateType
 	waiting		=	4
 };
 
-typedef enum processStateType stateType;			// Process States
+typedef enum processStateType stateType;				// Process States
 
-typedef struct processControlBlock PCB;				// PCB structure
+typedef struct processControlBlock PCB;					// PCB structure
 
-PCB* newPCB (char* processName, int argc, char** argv);		// Create new PCB 
+PCB* newPCB (char* processName, int argc, char** argv);			// Create new PCB 
 
-pid_t getPCBPid (PCB* pcb);					// Get process PID
+pid_t getPCBPid (PCB* pcb);						// Get process PID
 
-pid_t setPCBPid (PCB* pcb, pid_t pid);				// Set process PID
+pid_t setPCBPid (PCB* pcb, pid_t pid);					// Set process PID
 
-char* getPCBName (PCB* pcb);					// Get process name
+char* getPCBName (PCB* pcb);						// Get process name
 
-void setPCBName (PCB* pcb, char* name);				// Set process name
+void setPCBName (PCB* pcb, char* name);					// Set process name
 
-int getPCBArgc (PCB* pcb);					// Get process arguments counter
+int getPCBArgc (PCB* pcb);						// Get process arguments counter
 
-void setPCBArgc (PCB* pcb, int argc);				// Set process arguments counter
+void setPCBArgc (PCB* pcb, int argc);					// Set process arguments counter
 
-char** getPCBArgv (PCB* pcb);					// Get process arguments vector
+char** getPCBArgv (PCB* pcb);						// Get process arguments vector
 
-void setPCBArgv (PCB* pcb, char** argv);			// Set process arguments vector
+void setPCBArgv (PCB* pcb, char** argv);				// Set process arguments vector
 
-stateType getPCBState (PCB* pcb);				// Get process state
+stateType getPCBState (PCB* pcb);					// Get process state
 
-void setPCBState (PCB* pcb, stateType state);			// Set process state
+void setPCBState (PCB* pcb, stateType state);				// Set process state
 
-void setPCBState (PCB* pcb, stateType state);			// Set process state
+void setPCBState (PCB* pcb, stateType state);				// Set process state
 
 void getPCBTimeStructure (PCB* pcb, time_t* t_s, suseconds_t* t_us);	// Get process time controller structure
 
-void setPCBTimeStructure (PCB* pcb, struct timeval t);		// Set process time controller structure
+void setPCBTimeStructure (PCB* pcb, struct timeval t);			// Set process time controller structure
 
-char* getPCBQueue (PCB* pcb);					// Get process last/actual queue
+char* getPCBQueue (PCB* pcb);						// Get process last/actual queue
 
-void setPCBQueue (PCB* pcb, char* q);				// Set process last/actual queue
+void setPCBQueue (PCB* pcb, char* q);					// Set process last/actual queue
 

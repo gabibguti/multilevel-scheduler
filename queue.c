@@ -37,8 +37,6 @@ int queueLength (Queue* q)					// Calculate the length of the queue
 
 Queue* queuePush(Queue* q, PCB* newProcess)			// Push process to queue
 {
-	//printf("Trying to push process to queue\n");
-	//fflush(stdout);
 	struct timeval t;
 	Queue * p = q;
 	Queue* new = (Queue*) malloc (sizeof(Queue));
@@ -49,7 +47,6 @@ Queue* queuePush(Queue* q, PCB* newProcess)			// Push process to queue
 	}
 	if(strlen(getPCBName(newProcess)) <= 0) // Assert
 	{
-//		printf("Process has no name, wont push!\n");
 		return q;
 	}
 	PCB* pcbCopy = newPCB(getPCBName(newProcess), getPCBArgc(newProcess), getPCBArgv(newProcess));
@@ -76,9 +73,6 @@ Queue* queuePush(Queue* q, PCB* newProcess)			// Push process to queue
 		p->next = new;
 	}
 
-	//printf("Push succeeded\n");
-	//fflush(stdout);
-
 	return q;
 }
 
@@ -90,10 +84,6 @@ Queue* queuePull(Queue* q, PCB** removedProcess)			// Pull process from queue
 
 	if(p != NULL)
 	{
-		//removedProcess = p->pcb;
-		//removedProcess = newPCB (getPCBName(p->pcb));
-		//setPCBPid(removedProcess, getPCBPid(p->pcb));
-		//setPCBState(removedProcess, getPCBState(p->pcb));
 		pcbCopy = newPCB(getPCBName(p->pcb), getPCBArgc(p->pcb), getPCBArgv(p->pcb));
 		if(pcbCopy == NULL)
 		{
@@ -106,16 +96,11 @@ Queue* queuePull(Queue* q, PCB** removedProcess)			// Pull process from queue
 		setPCBTimeStructure(pcbCopy, t);
 		setPCBQueue(pcbCopy, getPCBQueue(p->pcb));
 		*removedProcess = pcbCopy;	
-		//printf("Process %s removed from queue.\n", getPCBName(pcbCopy));
 		if(q->next != NULL)
 			q = q->next;
 		else
 			q = NULL;
 	}
-	else
-	{
-		printf("Empty queue\n");
-	}	
 	
 	return q;
 }
@@ -127,18 +112,13 @@ Queue* queueFreeAll(Queue* q)					// Free all queue processes
 
 	if(q != NULL)
 	{
-		printf("Freeing all processes\n");
-		fflush(stdout);
 		for(p = q; p->next != NULL; p = p->next)
 		{
 			free(last);
 			last = p;
 		}
 	}
-
-	printf("Freeing suceeded\n");
-	fflush(stdout);
-	
+	printf("Freeing Processes\n");	
 	return NULL;
 }
 
@@ -208,12 +188,7 @@ void queueNextTime(Queue* q, time_t* t_s, suseconds_t* t_us)		// Get first proce
 	{
 		getPCBTimeStructure(p->pcb, t_s, t_us);
 	}
-	else
-	{
-		printf("Empty queue\n");
-	}
 
-	printf("Got next time controller\n");
 	fflush(stdout);
 }
 

@@ -14,7 +14,7 @@
 
 #include "errorControl.h"	// Error Control Definitions	
 
-#define parametersMAX 5		// Define max number of parameters
+#define parametersMAX 100	// Define max number of parameters
 
 enum returnConditions 	
 {
@@ -22,7 +22,8 @@ enum returnConditions
 	userProgram		=	1,
 	parametersExceeded	=	2,
 	blank			=	3,
-	ok			=       4
+	ok			=       4,
+	invalidCommand		=	5
 };
 
 typedef enum returnConditions returnCond;			// Return conditions
@@ -31,7 +32,8 @@ void clearArguments(int* argc, char** argv);			// Clear arguments counter (ARGC)
 
 returnCond interpretCmd (char* cmd, int* argc, char **argv);	// Command interpreter function
 
-/* Main */
+void tryAgain ();						// Invalid command
+
 int main(int argc, char * argv[])
 {
 	// Declarations                                                                                                       
@@ -47,7 +49,7 @@ int main(int argc, char * argv[])
 	{
 		// Declarations                                                                                                       
 	        int shmArea_programIdentifier;
-		int shmSize_programIdentifier = 100*sizeof(char);
+		int shmSize_programIdentifier = 400*sizeof(char);
 	        key_t key_programIdentifier = 8180;
 	        char* programIdentifier;
 
@@ -90,32 +92,27 @@ int main(int argc, char * argv[])
 		failVerification(errorControl , shm_at);
 
 		// Command Interpreter
-		printf("Starting Interpreter\t<%d>\n", pid_cmdInterpreter);
+		printf("\n***Command Interpreter start***\n");
                 *schedulerStatus = 1; // Set scheduler status to continue
 
 		while(state != exitProgram) // While dont exit
 		{
-			printf("> "); // Wait for command
+			//printf("\n> "); // Wait for command
 			fflush(stdin);
 			gets(cmd); // Get command
 			state = interpretCmd (cmd, &ARGC, ARGV); // Interpret command
-//			printf("state = %d\n", state);
                         if(state == userProgram) // Command: Execute user program
 			{
-				if(strcmp(ARGV[0], "exec") == 0) // Assert
+				// Send new program identification to scheduler
+				strcpy(cmd, ARGV[1]);
+				for(i = 2; i < ARGC; i++)
 				{
-					// Send new program identification to scheduler
-					strcpy(cmd, ARGV[1]);
-					for(i = 2; i < ARGC; i++)
-					{
-						strcat(cmd, "#");
-						strcat(cmd, ARGV[i]);
-					}
-//					printf("programIdentifier = %s\n", cmd);
-					strcpy(programIdentifier, cmd); // New process in shared memory
-					kill(pid_scheduler, SIGUSR1); // Warn scheduler
-					while(programIdentifier[0] != '\0') {  }
+					strcat(cmd, "#");
+					strcat(cmd, ARGV[i]);
 				}
+				strcpy(programIdentifier, cmd); // New process in shared memory
+				kill(pid_scheduler, SIGUSR1); // Warn scheduler
+				while(programIdentifier[0] != '\0') {  } // Wait for process finish creation
 			}
 			else 
 			{
@@ -136,7 +133,7 @@ int main(int argc, char * argv[])
 		errorControl = shmdt( /* adress */ schedulerStatus); // Scheduler Status - Shared Memory - DEATTACH
 		failVerification(errorControl, shm_dt);
 
-		printf("Ending Interpreter\n");
+		printf("\n***Command Interpreter end***\n");
 
 		_exit(1); // Leave
 	}
@@ -145,7 +142,8 @@ int main(int argc, char * argv[])
 		if (pid_scheduler == 0)	// Scheduler Process
 		{
 			pid_scheduler = getpid();
-			printf("Starting Scheduler\t<%d>\n", pid_scheduler);
+
+			printf("\n***Scheduler start***\n\n");
 
 			execve( "./scheduler", scheduler_args, NULL); // Execute scheduler process
 			perror("execve failed");
@@ -163,7 +161,7 @@ int main(int argc, char * argv[])
 
 /* Auxiliar Functions */
 
-void clearArguments(int* argc, char** argv)	// Clear argc and argv
+void clearArguments(int* argc, char** argv)			// Clear argc and argv
 {
 	int i;
 
@@ -178,7 +176,8 @@ void clearArguments(int* argc, char** argv)	// Clear argc and argv
 
 returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpreter function
 {
-	int i, start = 0, end = 0;
+	int i, j, start = 0, end = 0;
+	int number;
 
 	clearArguments(argc, argv);
 
@@ -244,6 +243,38 @@ returnCond interpretCmd (char* cmd, int* argc, char **argv)	// Command interpret
 		}
 	}
 
-	return userProgram;
+	// Final verifications
+	if(*argc < 3)
+	{
+		tryAgain();
+		return invalidCommand;		
+	}
+	if(strcmp(argv[0], "exec") != 0)
+	{
+		tryAgain();
+		return invalidCommand;
+	}
+	if(strcmp(argv[1], "userProgram") != 0)
+	{
+		tryAgain();
+		return invalidCommand;
+	}
+	for(i = 2; i < *argc; i++)
+	{
+		number = atoi(argv[i]);
+		if(number == 0)
+		{
+			printf("ERROR: Program dont accept zero as argument\n");
+			tryAgain();
+			return invalidCommand;		
+		}
+	}
+
+	return userProgram;	
+}
+
+void tryAgain ()						// Invalid command
+{
+	printf("Invalid command, please try again with:\nexec *program_name* *arguments*\nexit\n");
 }
 

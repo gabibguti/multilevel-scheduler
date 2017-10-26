@@ -1,0 +1,81 @@
+Testes
+
+## Primeira Camada de Testes
+
+#1
+exec
+exec userProgram
+exec userProgram ()
+exec userProgram (0)
+exec userProgram (b)
+exec programa (1)
+EXEC userProgram (1)
+exit
+
+#2
+exec userProgram (1,2,3)
+exec userProgram (1,2,3,4,5,6,7,8,9,10)
+
+#3
+exit
+
+## Segunda Camada de Testes
+
+#4
+exec userProgram (1)
+
+#5
+exec userProgram (2)
+
+#6
+exec userProgram (3)
+
+#7
+exec userProgram (10)
+
+#8
+exec userProgram (1)
+exec userProgram (2)
+exec userProgram (3)
+
+## Terceira Camada de Testes
+
+#9
+exec userProgram (10, 1)
+exec userProgram (3, 3)
+
+#10
+exec userProgram (1)
+exec userProgram (1,1)
+
+#11
+exec userProgram (1)
+exec userProgram (1,1)
+exec userProgram (1,1,1)
+
+#12
+exec userProgram (1)
+exec userProgram (1,1)
+exec userProgram (1,1,1)
+exec userProgram (1,1,1,1)
+
+#13
+exec userProgram (10,1,1)
+exec userProgram (6,3,3)
+
+#14
+exec userProgram (2, 1)
+exec userProgram (2, 1)
+exec userProgram (2, 1)
+
+#15
+exec userProgram (7, 4)
+exec userProgram (5, 5)
+exec userProgram (4, 3, 3, 3)
+
+#16
+exec userProgram (7, 4)
+exec userProgram (5, 5)
+exit
+
+
